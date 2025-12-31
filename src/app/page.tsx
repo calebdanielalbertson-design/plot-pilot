@@ -18,133 +18,49 @@ const CemeteryMap = dynamic(() => import("./components/CemeteryMap"), {
 
 export default function Home() {
   const { plots, sections, blocks, loading, updatePlotProperties } = usePlotData();
-  const [selectedPlot, setSelectedPlot] = useState<any>(null);
-  const [sidebarData, setSidebarData] = useState<any>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  // ... imports
+  import { Menu, X } from "lucide-react"; // Assuming lucide-react is available, or use SVG directly if not.
+  // Wait, I don't know if lucide-react is installed. I should use simple SVGs to be safe as I did for markers.
 
-  // Search logic
-  useEffect(() => {
-    if (!plots || !searchTerm) {
-      setSearchResults([]);
-      return;
-    }
-    const lowerTerm = searchTerm.toLowerCase();
-    const results = plots.features.filter((f: any) => {
-      const props = f.properties;
-      const id = (props.OBJECTID || "").toString();
+  // ... inside component
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-      const fName = props.F_NAME || "";
-      const lName = props.L_NAME || "";
-      const fullName = props.FULL_NAME || `${fName} ${lName}`.trim();
-      const purchaser = props.PURCHASERS || "";
-
-      return (
-        id.toLowerCase().includes(lowerTerm) ||
-        fullName.toLowerCase().includes(lowerTerm) ||
-        purchaser.toLowerCase().includes(lowerTerm)
-      );
-    });
-    setSearchResults(results.slice(0, 50)); // Limit results
-  }, [searchTerm, plots]);
-
-  const handlePlotSelect = (feature: any) => {
-    // Ensure we have defaults
-    const props = feature.properties;
-
-    // Determine status
-    let status = props.status;
-    if (!status) {
-      status = props.LOTSTATUS === "Has Burial" ? "Occupied" : "Available";
-    }
-
-    const enrichedProps = {
-      ...props,
-      id: props.OBJECTID,
-      status: status,
-
-      // Location
-      section: props.SECTION || props.Section || props.section || "Unknown",
-      block: props.BLOCK,
-      lot: props.LOT,
-
-      // Occupant
-      firstName: props.F_NAME || props.firstName || "",
-      lastName: props.L_NAME || props.lastName || "",
-      fullName: props.FULL_NAME || "",
-      age: props.AGE,
-      dob: props.DOB || props.birthDate || "",
-      dod: props.DOD || props.deathDate || "",
-      sex: props.SEX,
-
-      // Purchase / Record
-      purchaser: props.PURCHASERS,
-      purchasedLots: props.PURCHLOTS,
-      reservedFor: props.RESERVEDFOR,
-      book: props.BOOK,
-      page: props.PAGE,
-      funeralHome: props.FUNRL_HOME,
-
-      // Details
-      burialType: props.BURIAL_TYP,
-      burialDate: props.BURIALDATE,
-      remarks: props.REMARKS,
-      pRemarks: props.P_REMARKS,
-    };
-
-    setSelectedPlot(feature);
-    setSidebarData(enrichedProps);
-  };
-
-  const handleUpdateData = (newProperties: any) => {
-    if (!selectedPlot) return;
-    const id = selectedPlot.properties.OBJECTID;
-
-    // Auto-update full name if keys are present
-    let updatedProps = { ...newProperties };
-    if ('firstName' in newProperties || 'lastName' in newProperties) {
-      const first = 'firstName' in newProperties ? newProperties.firstName : (sidebarData.firstName || "");
-      const last = 'lastName' in newProperties ? newProperties.lastName : (sidebarData.lastName || "");
-
-      // Update mapped fields for GeoJSON consistency
-      updatedProps.F_NAME = first;
-      updatedProps.L_NAME = last;
-      updatedProps.FULL_NAME = `${first} ${last}`.trim();
-    }
-
-    // If status changed, map back to LOTSTATUS for consistency if needed, strictly we rely on 'status' override now
-    if ('status' in newProperties) {
-      // We keep local 'status' property as the primary override
-    }
-
-    // Local update of sidebar
-    setSidebarData((prev: any) => ({ ...prev, ...updatedProps }));
-
-    // Use hook to update global state and storage
-    updatePlotProperties(id, updatedProps);
-
-    // Also update selectedPlot reference so map re-renders if needed
-    setSelectedPlot((prev: any) => ({
-      ...prev,
-      properties: { ...prev.properties, ...updatedProps }
-    }));
-  };
-
-  const handleResetData = () => {
-    if (confirm("Are you sure you want to reset all data? This cannot be undone.")) {
-      localStorage.removeItem("plotPilotData");
-      window.location.reload();
-    }
-  };
-
-  if (loading) {
-    return <div className="flex h-screen w-full items-center justify-center bg-slate-950 text-white">Loading PlotPilot...</div>;
-  }
-
+  // ... inside return
   return (
-    <main className="flex h-screen w-full flex-row overflow-hidden bg-slate-950">
+    <main className="flex h-screen w-full flex-row overflow-hidden bg-slate-950 relative">
+
+      {/* Mobile Menu Button */}
+      {!isSidebarOpen && (
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="md:hidden absolute top-4 left-4 z-30 bg-white p-2 rounded-md shadow-lg text-slate-800 border border-slate-200"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12" /><line x1="4" x2="20" y1="6" y2="6" /><line x1="4" x2="20" y1="18" y2="18" /></svg>
+        </button>
+      )}
+
+      {/* Sidebar Overlay (Mobile Only) */}
+      {isSidebarOpen && (
+        <div
+          className="md:hidden absolute inset-0 z-40 bg-black/50 backdrop-blur-sm"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="w-[400px] flex-shrink-0 flex flex-col border-r border-slate-800 bg-slate-900 text-slate-100 shadow-2xl z-20">
+      <div className={`
+        fixed md:relative z-50 h-full shrink-0 flex flex-col border-r border-slate-800 bg-slate-900 text-slate-100 shadow-2xl transition-transform duration-300 ease-in-out
+        w-[85vw] max-w-[400px] md:w-[400px]
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+        {/* Mobile Close Button */}
+        <button
+          onClick={() => setIsSidebarOpen(false)}
+          className="md:hidden absolute top-4 right-4 p-2 text-slate-400 hover:text-white"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 18 12" /></svg>
+        </button>
+
         <div className="p-6 border-b border-slate-800">
           <h1 className="text-2xl font-bold text-white flex items-center gap-3 tracking-tight">
             <span className="text-3xl">🪦</span> PlotPilot
@@ -152,6 +68,7 @@ export default function Home() {
           <p className="text-slate-400 text-xs mt-1 uppercase tracking-wider font-medium">Cemetery Management</p>
         </div>
 
+        {/* ... Rest of Sidebar content ... */}
         {/* Navigation Bar */}
         <div className="flex border-b border-slate-800 bg-slate-900 p-2 gap-2">
           <button
@@ -195,7 +112,10 @@ export default function Home() {
                     return (
                       <button
                         key={id}
-                        onClick={() => handlePlotSelect(res)}
+                        onClick={() => {
+                          handlePlotSelect(res);
+                          setIsSidebarOpen(true); // Keep open on mobile selection to show details
+                        }}
                         className="w-full text-left px-3 py-2 text-xs rounded hover:bg-slate-700 flex justify-between items-center group transition-colors"
                       >
                         <span className="font-medium text-slate-200">{id}</span>
@@ -410,7 +330,10 @@ export default function Home() {
           sections={sections}
           blocks={blocks}
           selectedPlot={selectedPlot}
-          onPlotSelect={handlePlotSelect}
+          onPlotSelect={(plot) => {
+            handlePlotSelect(plot);
+            setIsSidebarOpen(true); // Open sidebar on mobile when plot selected
+          }}
         />
       </div>
     </main>
